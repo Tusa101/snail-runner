@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Snail Runner — prototype</title>
+<style>
+  :root {
+    --ink: #2f3a2a;
+    --paper: rgba(255, 255, 255, 0.82);
+    --dew: #6ed7e8;
+    --boost: #f28c45;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe9f5; touch-action: none; overscroll-behavior: none; }
+  body { font-family: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink); user-select: none; -webkit-user-select: none; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; width: 100%; height: 100%; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+  .pill { background: var(--paper); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 20px; line-height: 1; box-shadow: 0 2px 0 rgba(47,58,42,0.15); }
+  #distance { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); font-size: 26px; min-width: 110px; text-align: center; }
+  #dew { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 14px; color: #1b8a9a; }
+  #dew::before { content: "💧"; margin-right: 4px; }
+  #boost { position: absolute; right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); width: 60px; height: 60px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-weight: 900; font-size: 11px; color: #9a9a90; letter-spacing: 0.5px; }
+  #boostRing { --fill: 0; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--boost) calc(var(--fill) * 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%); mask: radial-gradient(circle, transparent 60%, #000 62%); }
+  #boost.ready { color: var(--boost); }
+  #boost.active { color: #fff; background: var(--boost); }
+  #boost.unavailable { opacity: 0.35; }
+  #boost.unavailable::after { content: ""; position: absolute; width: 70%; height: 3px; background: #9a9a90; transform: rotate(-45deg); border-radius: 2px; }
+  #shellmap { position: absolute; left: 14px; bottom: max(14px, env(safe-area-inset-bottom)); width: 64px; height: 64px; }
+  #toast { position: absolute; top: 28%; left: 50%; transform: translateX(-50%) scale(0.9); font-size: 34px; font-weight: 900; color: #fff; -webkit-text-stroke: 1.5px #2f3a2a; text-shadow: 0 3px 0 rgba(47,58,42,0.35); opacity: 0; transition: opacity 0.15s, transform 0.15s; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+  #toast.bad { color: #ffb3a7; }
+  #toast.good { color: #d8ffb0; }
+  #toast.ram { color: #ffd166; font-size: 44px; }
+
+  .screen { position: fixed; inset: 0; display: none; place-items: center; z-index: 5; pointer-events: none; }
+  .screen.open { display: grid; }
+  .screen .card { pointer-events: auto; text-align: center; background: rgba(255,255,255,0.86); border-radius: 22px; padding: 22px 28px; min-width: 240px; box-shadow: 0 6px 0 rgba(47,58,42,0.18); }
+  .screen h1 { margin: 0 0 6px; font-size: 40px; letter-spacing: 1px; }
+  .screen .stat { font-size: 20px; font-weight: 800; margin: 4px 0; }
+  .screen .note { font-size: 14px; font-weight: 700; color: #1b8a9a; min-height: 18px; margin: 6px 0 4px; }
+  .screen .buttons { display: grid; gap: 8px; margin-top: 12px; }
+  .screen button { font: inherit; font-weight: 900; font-size: 18px; letter-spacing: 0.5px; padding: 12px 18px; border-radius: 999px; border: 0; cursor: pointer; background: #4f6b47; color: #fff; box-shadow: 0 4px 0 #35492f; }
+  .screen button:active { transform: translateY(3px); box-shadow: 0 1px 0 #35492f; }
+  .screen button.secondary { background: #b5d884; color: var(--ink); box-shadow: 0 4px 0 #86ad5e; }
+  #menu .snailTitle { font-size: 14px; font-weight: 800; color: #6f7e63; margin-bottom: 10px; }
+  #builder { pointer-events: none; }
+  #builder .card { width: min(94vw, 420px); padding: 16px 16px 14px; }
+  #builder h1 { font-size: 26px; margin-bottom: 2px; }
+  #builderDew { font-weight: 800; color: #1b8a9a; margin-bottom: 6px; }
+  #builderRing { position: relative; width: min(64vw, 250px); aspect-ratio: 1; margin: 6px auto 8px; border-radius: 50%; background: radial-gradient(circle, #e9d9bd 0 22%, #d8c39b 23% 100%); box-shadow: inset 0 0 0 4px rgba(255,255,255,0.6); }
+  #builderRing::after { content: "▲"; position: absolute; left: 50%; top: -18px; transform: translateX(-50%); font-size: 12px; color: #6f7e63; }
+  .slot, .chip { display: grid; place-items: center; color: #fff; font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,0.25); border-radius: 50%; cursor: grab; touch-action: none; box-shadow: 0 3px 0 rgba(47,58,42,0.25), inset 0 0 0 3px rgba(255,255,255,0.5); transition: transform 0.1s; }
+  .slot { position: absolute; width: 27%; aspect-ratio: 1; transform: translate(-50%, -50%); font-size: 12px; line-height: 1; }
+  .slot small { font-size: 9px; opacity: 0.85; height: 10px; }
+  .slot.hover { transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 0 0 4px #fff, 0 3px 0 rgba(47,58,42,0.25); }
+  .slot.selected, .chip.selected { box-shadow: 0 0 0 4px var(--ink), 0 3px 0 rgba(47,58,42,0.25); }
+  #builderPalette { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+  .chip { width: 56px; height: 56px; font-size: 11px; }
+  .chip small { font-size: 9px; }
+  #builderInfo { min-height: 66px; font-size: 13px; font-weight: 700; line-height: 1.35; text-align: left; background: rgba(47,58,42,0.06); border-radius: 12px; padding: 8px 10px; }
+  #builderInfo .name { font-size: 16px; font-weight: 900; }
+  #builderInfo .syn { color: #1b8a9a; }
+  #builderInfo .tip { color: #6f7e63; }
+  #btnUpgrade { margin-top: 8px; font-size: 14px !important; padding: 8px 14px !important; }
+  #btnUpgrade:disabled { opacity: 0.45; box-shadow: none; }
+  #builder .buttons { grid-template-columns: 1fr 1fr; }
+  #builderGhost { position: fixed; display: none; width: 60px; height: 60px; border-radius: 50%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; color: #fff; font-weight: 900; font-size: 11px; display: none; place-items: center; box-shadow: 0 6px 12px rgba(0,0,0,0.25); }
+  #hint { position: absolute; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: rgba(47,58,42,0.55); text-align: center; white-space: nowrap; }
+  @media (pointer: coarse) { #hint.desktop { display: none; } }
+  @media (pointer: fine) { #hint.mobile { display: none; } }
+
+  #debug { position: fixed; top: 60px; left: 10px; width: 230px; background: rgba(30, 34, 28, 0.92); color: #e8f0dc; border-radius: 10px; padding: 10px 12px; font-size: 12px; z-index: 10; display: none; }
+  #debug.open { display: block; }
+  #debug h3 { margin: 0 0 8px; font-size: 13px; }
+  #debug label { display: grid; grid-template-columns: 1fr 44px; align-items: center; gap: 6px; margin: 4px 0; }
+  #debug label input[type=range] { grid-column: 1 / -1; width: 100%; }
+  #debug label span { text-align: right; opacity: 0.8; }
+  #debug .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  #debug button { flex: 1 1 45%; background: #4f6b47; color: #fff; border: 0; border-radius: 6px; padding: 6px 4px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  #debug button:disabled { background: #444; color: #999; cursor: default; }
+  #btnMute { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 54px; z-index: 11; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(47,58,42,0.35); font-size: 15px; cursor: pointer; }
+  #debugToggle { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 14px; z-index: 11; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(47,58,42,0.35); color: #fff; font-weight: 900; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <div id="hud">
+    <div id="distance" class="pill">0 m</div>
+    <div id="dew" class="pill">0</div>
+    <div id="boost"><div id="boostRing"></div>BOOST</div>
+    <svg id="shellmap" viewBox="-50 -50 100 100"></svg>
+    <div id="toast"></div>
+    <div id="hint" class="desktop">A/D or ←/→ lanes · W/Space jump · Shift boost · R restart · M sound · ` debug</div>
+    <div id="hint" class="mobile">Swipe to change lane · swipe up to jump · double tap to boost</div>
+  </div>
+
+  <div id="menu" class="screen">
+    <div class="card">
+      <div class="snailTitle">Snail Runner</div>
+      <div id="menuBest" class="stat">BEST: 0 m</div>
+      <div id="menuDew" class="stat">DEW: 0</div>
+      <div id="menuStats" class="note"></div>
+      <div class="buttons">
+        <button id="btnRun">RUN</button>
+        <button id="btnShell" class="secondary">SHELL</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="runover" class="screen">
+    <div class="card">
+      <h1>RUN OVER</h1>
+      <div id="overDistance" class="stat">Distance: 0 m</div>
+      <div id="overDew" class="stat">Dew: 0</div>
+      <div id="overNote" class="note"></div>
+      <div class="buttons">
+        <button id="btnRunAgain">RUN AGAIN</button>
+        <button id="btnRebuild" class="secondary">REBUILD SHELL</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="builder" class="screen">
+    <div class="card">
+      <h1>SHELL</h1>
+      <div id="builderDew">💧 0</div>
+      <div id="builderRing"></div>
+      <div id="builderPalette"></div>
+      <div id="builderInfo"></div>
+      <button id="btnUpgrade" class="secondary">UPGRADE</button>
+      <div class="buttons">
+        <button id="btnBuilderBack" class="secondary">BACK</button>
+        <button id="btnBuilderRun">RUN</button>
+      </div>
+    </div>
+  </div>
+  <div id="builderGhost"></div>
+
+  <button id="debugToggle" title="Debug panel">⚙</button>
+  <button id="btnMute" title="Sound (M)">🔊</button>
+  <div id="debug">
+    <h3>Debug</h3>
+    <label>Game speed <span data-val="gameSpeed"></span><input type="range" data-key="gameSpeed" min="0.1" max="2" step="0.05"></label>
+    <label>Player speed <span data-val="playerSpeed"></span><input type="range" data-key="playerSpeed" min="0.3" max="2.5" step="0.05"></label>
+    <label>Sector HP × <span data-val="sectorHpMul"></span><input type="range" data-key="sectorHpMul" min="0.2" max="3" step="0.1"></label>
+    <label>Obstacle dmg × <span data-val="obstacleDamageMul"></span><input type="range" data-key="obstacleDamageMul" min="0" max="3" step="0.1"></label>
+    <label>Spawn density <span data-val="spawnDensity"></span><input type="range" data-key="spawnDensity" min="0.3" max="3" step="0.1"></label>
+    <label><span style="text-align:left">Invulnerable</span><input type="checkbox" data-key="invulnerable"></label>
+    <label>Dew amount <span data-val="dewAmount"></span><input type="range" data-key="dewAmount" min="0" max="1000" step="10"></label>
+    <div class="row">
+      <button data-action="damageShell">DAMAGE SHELL</button>
+      <button data-action="breakSector">BREAK SECTOR</button>
+      <button data-action="activateBoost">ACTIVATE BOOST</button>
+      <button data-action="spawnRam">SPAWN RAM TEST</button>
+      <button data-action="restart">RESTART RUN</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
