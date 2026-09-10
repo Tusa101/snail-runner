@@ -36,7 +36,7 @@ export function resolveCollision(type, { hasSpike = false, boostActive = false, 
   return { outcome: 'hit', shellDamage: Math.round(o.damage * damageMul), spikeDamage: 0, slow: o.slow || null };
 }
 
-// GDD §4 speed schedule.
+// GDD §4 speed schedule (numbers live in CONFIG; tuned after playtest).
 export function speedAt(elapsed, cfg = CONFIG) {
   const ramp = Math.floor(elapsed / cfg.speedInterval) * cfg.speedStep;
   return Math.min(cfg.maxSpeed, cfg.startSpeed + ramp);

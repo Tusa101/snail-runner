@@ -10,13 +10,13 @@ Run tests: `npm test` (Node 20+, no install needed — uses `node:test` and a Th
 |---|---|---|---|
 | §2 | PC keys A/D/←/→, W/↑/Space, Shift, R; mobile swipes + double tap | `systems/InputSystem.js` | manual (P1) |
 | §3 | Lanes −2/0/+2, 0.2 s smooth change, tilt/eyes/shell lag | `config.js`, `player/Snail.js` | `game.test` (lane x = −2 after moveLane); feel manual (P2) |
-| §4 | Speed 12 → +0.7 / 15 s → cap 22 | `core/rules.js speedAt` | `rules.test §4` |
-| §6 | 6 outer sectors, each a separate mesh | `player/Shell.js` | `game.test Run 1` (6 destroyed, ≥6 debris meshes) |
+| §4 | Speed ramp (tuned after playtest: 13 → +1.2 / 10 s → cap 30, in CONFIG) | `core/rules.js speedAt` | `rules.test §4` |
+| §5–6 | Shell is an edge-standing ring of 6 sector meshes rolling like a wheel; snail sleeps curled inside (Zzz), wakes only on death | `player/Shell.js` | `game.test Run 1` (6 destroyed, ≥6 debris meshes) |
 | §7 | Sector HP tables; no global HP bar | `core/ShellState.js sectorMaxHp` | `shell-state.test §7/§12/§32` |
 | §8 | Frontal hit 60/20/20 on front zones, only living sectors | `ShellState.pickHitSlot` | `shell-state.test §8` (10k-sample distribution, fallback when front is gone) |
 | §9 | Healthy >60 % / Damaged 31–60 / Critical 1–30 / Destroyed | `ShellState sectorState` | `shell-state.test §9` |
 | §10 | Break: hit-stop 50–70 ms, shake, detach back+up, spin, debris | `game/Game.js _applyShellEvents`, `Shell._detach`, `objects/Debris.js` | `game.test Run 1` (debris count); timing manual (P5) |
-| §11 | Last sector: slow-mo 20 %, shell collapses, slug flies, flops, looks, blinks, RUN OVER | `Game._startGameOver`, `Snail._updateSlug`, `HUD.showRunOver` | `game.test Run 1` (state → RUN OVER screen + stats); animation manual (P6) |
+| §11 | Last sector: slow-mo 20 %, shell collapses, snail drops out (PLOP), lies, wakes, looks at camera, blinks, crawls off the road, RUN OVER | `Game._startGameOver`, `Snail._updateSlug`, `HUD.showRunOver` | `game.test Run 1` (state → RUN OVER screen + stats); animation manual (P6) |
 | §12 | Types Armor/Jump/Spike/Boost/Magnet with HP, colors, abilities | `config.js SECTOR_TYPES`, `core/rules.js` | `shell-state.test`, `rules.test` |
 | §12.4 | Boost +50 % for 1.5 s, cooldown 8/7/6 | `core/BoostState.js` | `rules.test §12.4`, `game.test Run 3` |
 | §12.5 | Magnet radius 3.5/4.5/5.5 | `rules.js magnetRadius`, `Game._updateMagnet` | `rules.test`, `game.test Magnet` |
@@ -37,7 +37,7 @@ Run tests: `npm test` (Node 20+, no install needed — uses `node:test` and a Th
 | §32 | Upgrades 3 levels, 100 / 250 dew | `SaveState upgrade`, `rules.js` | `rules.test §32`, `game.test Shell Builder` |
 | §33 | No repair — sectors restore after each run | `ShellState.repairAll` | `shell-state.test §33` |
 | §35–36 | Milestones 250…2000 + NEW DISTANCE!; stats best/dew/runs/destroyed | `Game._updateRun`, `SaveState` | `rules.test §35/§36` |
-| §41–42 | Collision pipeline and Spike pseudo-logic | `systems/CollisionSystem.js`, `rules.js` | `rules.test §42`, `game.test Runs 4–5` |
+| §41–42 | Collision pipeline and Spike pseudo-logic; a plain hit leaves the obstacle in place and stumbles the snail (bump, squash, 0.5 s slow, dust) | `systems/CollisionSystem.js`, `rules.js` | `rules.test §42`, `game.test Runs 4–5` |
 | §43 | Shell spins visually, logical slots stay fixed | `Shell.update` | by construction (slots never rotate) |
 | §44–45 | No physics engine: distance checks + manual debris integration | `CollisionSystem`, `Debris` | soak test |
 | §47 | localStorage save shape, tolerant of corruption | `SaveState loadSave/persistSave` | `rules.test §47` |
@@ -57,6 +57,7 @@ P6. Game Over: slow-mo, shell rains off, slug flops on its belly, eyes rise, one
 P7. RAM MODE (debug → SPAWN RAM TEST): chain of CRUNCH/CRASH feels like the best moment of the run.
 P8. Apple is readable and dodgeable; bird shadow gives 0.8 s of warning.
 P9. Shell Builder on a phone: drag from palette and slot-to-slot swap work with a finger.
-P10. Phone performance: steady frame rate for a full 2-minute run.
+P10. PHONE VIEW button in the menu (desktop) previews the portrait layout in a 390×800 frame.
+P11. Phone performance: steady frame rate for a full 2-minute run.
 
 Success signals (§51): the tester starts talking about *where* to put sectors.

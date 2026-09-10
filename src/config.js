@@ -4,10 +4,11 @@ export const CONFIG = {
   lanes: [-2, 0, 2],
   laneChangeTime: 0.2,
 
-  startSpeed: 12,
-  speedStep: 0.7,
-  speedInterval: 15,
-  maxSpeed: 22,
+  // Tuned up after the first playtest (GDD had 12 / +0.7 per 15 s / 22 — felt too slow).
+  startSpeed: 13,
+  speedStep: 1.2,
+  speedInterval: 10,
+  maxSpeed: 30,
 
   jump: { height: 2.3, duration: 0.66 },
 

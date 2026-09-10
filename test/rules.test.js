@@ -7,12 +7,14 @@ import { CHUNKS } from '../src/track/chunks.js';
 import { CONFIG } from '../src/config.js';
 
 describe('GDD §4 — speed schedule', () => {
-  test('12 at start, +0.7 every 15 s, capped at 22', () => {
-    assert.equal(speedAt(0), 12);
-    assert.equal(speedAt(14.99), 12);
-    assert.equal(speedAt(15), 12.7);
-    assert.equal(speedAt(30), 13.4);
-    assert.equal(speedAt(10000), 22);
+  test('starts at startSpeed, steps every interval, capped at maxSpeed (values tuned in CONFIG)', () => {
+    const { startSpeed: s0, speedStep: st, speedInterval: iv, maxSpeed: mx } = CONFIG;
+    assert.equal(speedAt(0), s0);
+    assert.equal(speedAt(iv - 0.01), s0);
+    assert.equal(speedAt(iv), s0 + st);
+    assert.equal(speedAt(iv * 2), s0 + st * 2);
+    assert.equal(speedAt(10000), mx);
+    assert.ok(mx > s0 * 1.8, 'ramps to nearly double: the run must get demanding');
   });
 });
 

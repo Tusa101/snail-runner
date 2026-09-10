@@ -18,6 +18,7 @@ manual playtest checklist for the things only a browser can verify.
 
 ## Controls
 Desktop: A/D or ←/→ lanes · W/↑/Space jump · Shift boost · R restart · Esc back · M sound · ` debug
+Menu → PHONE VIEW previews the portrait layout on a laptop.
 Mobile: swipe left/right · swipe up jump · double tap boost · ⚙ debug panel
 
 ## Layout

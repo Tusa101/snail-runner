@@ -2,15 +2,18 @@ import * as THREE from 'three';
 import { SECTOR_TYPES } from '../config.js';
 import { damp, mat, shadowed, rand } from '../utils.js';
 
-export const SHELL_RADIUS = 1.05;
-export const SHELL_DEPTH = 0.7;
+// The shell is a wheel: a thick ring standing on its edge (plane y-z, axle along x)
+// that rolls forward while the snail sleeps curled up in the hollow middle.
+export const SHELL_RADIUS = 1.15;
+export const SHELL_INNER = 0.62;
+export const SHELL_DEPTH = 0.8;
 
 export function makeWedgeGeometry(index, count = 6, radius = SHELL_RADIUS, depth = SHELL_DEPTH) {
-  const gap = 0.05;
+  const gap = 0.04;
   const a0 = (index / count) * Math.PI * 2 + gap;
   const a1 = ((index + 1) / count) * Math.PI * 2 - gap;
   const shape = new THREE.Shape();
-  const inner = 0.22;
+  const inner = SHELL_INNER;
   shape.moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner);
   shape.lineTo(Math.cos(a0) * radius, Math.sin(a0) * radius);
   shape.absarc(0, 0, radius, a0, a1, false);
@@ -26,10 +29,11 @@ export function makeWedgeGeometry(index, count = 6, radius = SHELL_RADIUS, depth
 // Per-type silhouette detail so sectors read at a glance (GDD §12).
 function addTypeDetail(type, wedge, index) {
   const mid = ((index + 0.5) / 6) * Math.PI * 2;
-  const r = 0.68;
+  const r = (SHELL_RADIUS + SHELL_INNER) / 2;
   const cx = Math.cos(mid) * r, cy = Math.sin(mid) * r;
   const z = SHELL_DEPTH / 2 + 0.06;
-  const add = (m) => { m.position.set(cx, cy, z); wedge.add(m); return m; };
+  // Face details go on both sides of the wheel so they read from either lane.
+  const add = (m) => { m.position.set(cx, cy, z); wedge.add(m); const m2 = m.clone(); m2.position.z = -z; wedge.add(m2); return m; };
   switch (type) {
     case 'spike': {
       for (const off of [-0.2, 0, 0.2]) {
@@ -47,11 +51,12 @@ function addTypeDetail(type, wedge, index) {
       break;
     }
     case 'boost': {
+      // Nozzles on the rim, pointing back-ish out of the tread
       for (const off of [-0.17, 0.17]) {
-        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.16, 8), mat(0x4a3220));
-        nozzle.rotation.x = Math.PI / 2;
+        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.22, 8), mat(0x4a3220));
         const a = mid + off;
-        nozzle.position.set(Math.cos(a) * r, Math.sin(a) * r, z);
+        nozzle.position.set(Math.cos(a) * (SHELL_RADIUS + 0.02), Math.sin(a) * (SHELL_RADIUS + 0.02), 0);
+        nozzle.rotation.z = a - Math.PI / 2;
         wedge.add(nozzle);
       }
       break;
@@ -75,7 +80,7 @@ function makeCrack(index, size) {
   const mid = ((index + 0.5) / 6) * Math.PI * 2;
   const dark = mat(0x2a1f14);
   const n = size === 'big' ? 4 : 2;
-  let r = 0.35, a = mid + rand(-0.2, 0.2);
+  let r = SHELL_INNER + 0.05, a = mid + rand(-0.2, 0.2);
   for (let i = 0; i < n; i++) {
     const len = rand(0.18, 0.3);
     const seg = new THREE.Mesh(new THREE.BoxGeometry(0.035, len, 0.03), dark);
@@ -98,10 +103,8 @@ export class Shell {
     this.sectors = [];
     this.flashT = 0;
     this.collapsed = false;
-    this.hub = shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), mat(0x8c6b3f)));
-    this.hub.scale.set(1, 1, 0.9);
-    this.spin.add(this.hub);
-    this.group.rotation.x = -0.15;
+    // Stand the ring on its edge: local z (extrusion axis) becomes world x = the axle.
+    this.group.rotation.y = Math.PI / 2;
     this.bind(state);
   }
 
@@ -110,7 +113,6 @@ export class Shell {
     for (const s of this.sectors) this.spin.remove(s.mesh);
     this.sectors = [];
     this.collapsed = false;
-    this.hub.visible = true;
     state.slots.forEach((slot, i) => {
       const def = SECTOR_TYPES[slot.type];
       const material = mat(def.color).clone();
@@ -176,15 +178,14 @@ export class Shell {
     this.collapsed = true;
     for (const s of this.sectors) if (s.alive) this._detach(s.index, debris, 1.4);
     const pos = new THREE.Vector3();
-    this.hub.getWorldPosition(pos);
-    this.hub.visible = false;
-    debris.burst(pos, [0x8c6b3f], 6, 5);
+    this.group.getWorldPosition(pos);
+    debris.burst(pos, [0x8c6b3f, 0xc99b5d], 6, 5);
   }
 
   update(dt, speed, lag) {
-    // Visual roll (GDD §43): gameplay slots stay logical, only the mesh spins.
-    this.spin.rotation.z -= speed * dt * 0.15;
-    this.group.rotation.z = lag * 1.5;
+    // Rolls like a wheel (GDD §43): gameplay slots stay logical, only the mesh spins.
+    this.spin.rotation.z -= (speed / SHELL_RADIUS) * dt;
+    this.group.rotation.x = lag * 1.5; // lean lag (axle tilts slightly behind the body)
 
     for (const s of this.sectors) {
       if (!s.alive) continue;

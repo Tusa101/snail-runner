@@ -134,8 +134,21 @@ export class Game {
     on('btnRunAgain', () => this.startRun());
     on('btnRebuild', () => this.openShellBuilder());
     on('btnMute', () => this.toggleMute());
+    on('btnView', () => this.setPhoneView(!document.body.classList.contains('phone')));
+    let phone = false;
+    try { phone = this.storage && this.storage.getItem('snail-runner-view') === 'phone'; } catch { /* ignore */ }
+    this.setPhoneView(phone);
     // Pause the clock while the tab is hidden so we don't get a giant catch-up step.
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.clock.getDelta(); });
+  }
+
+  // Desktop-only preview of the portrait phone layout (GDD §26: portrait is the target).
+  setPhoneView(on) {
+    document.body.classList.toggle('phone', on);
+    const b = document.getElementById('btnView');
+    if (b) b.textContent = on ? 'LAPTOP VIEW' : 'PHONE VIEW';
+    try { this.storage && this.storage.setItem('snail-runner-view', on ? 'phone' : 'laptop'); } catch { /* ignore */ }
+    this._resize();
   }
 
   toggleMute() {
@@ -283,7 +296,7 @@ export class Game {
 
   onObstacleHit(o) {
     o.hit = true;
-    if (DEBUG.invulnerable) { this._removeObstacle(o, 3); return; }
+    if (DEBUG.invulnerable) { this._dustPuff(o); return; }
 
     const res = resolveCollision(o.type, {
       hasSpike: this.shellState.hasAbility('spike'),
@@ -315,14 +328,22 @@ export class Game {
       return;
     }
 
-    // Plain hit
+    // Plain hit: the obstacle stays put — the snail is the one that gets knocked.
     this.sound.hit();
-    this.hitStop = 0.06;
-    this.shake = Math.max(this.shake, 0.6);
+    this.hitStop = 0.08;
+    this.shake = Math.max(this.shake, 0.8);
     this.snail.hitReact();
+    this._dustPuff(o);
     if (res.slow) { this.slowT = res.slow.duration; this.slowFactor = res.slow.factor; }
-    if (!o.persistent) this._removeObstacle(o, 5);
+    else { this.slowT = 0.5; this.slowFactor = 0.45; } // stumble
     this._applyShellEvents(this.shellState.damage(res.shellDamage));
+  }
+
+  _dustPuff(o) {
+    const pos = new THREE.Vector3();
+    o.group.getWorldPosition(pos);
+    pos.z += 0.6;
+    this.debris.burst(pos, [0xe8f0dc, 0xd8e6c8], 5, 2.5);
   }
 
   // RAM MODE payoff (GDD §50 run 5): smashed things spray dew that flies to the snail.
@@ -484,7 +505,8 @@ export class Game {
     const sx = (Math.random() - 0.5) * k;
     const sy = (Math.random() - 0.5) * k;
 
-    const target = this.snail.group.position;
+    const target = this.snail.group.position.clone();
+    if (this.snail.slug) target.add(this.snail.slugBody.position);
     const followX = target.x * 0.3;
     this.camera.position.x = damp(this.camera.position.x, followX, 8, dt) + sx;
     this.camera.position.y = cam.y + target.y * 0.25 + sy;

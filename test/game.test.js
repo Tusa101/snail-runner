@@ -40,6 +40,34 @@ describe('GDD §30 — game states and screens', () => {
     assert.ok(game.renderer.frames > 100, 'frames render');
   });
 
+  test('phone view toggles a body class, persists, and resizes the renderer', () => {
+    const game = makeGame();
+    game.start();
+    let resized = 0; game._resize = () => { resized++; };
+    game.setPhoneView(true);
+    assert.ok(document.body.classList.contains('phone'));
+    assert.equal(dom.storage.getItem('snail-runner-view'), 'phone');
+    game.setPhoneView(false);
+    assert.ok(!document.body.classList.contains('phone'));
+    assert.equal(resized, 2);
+  });
+
+  test('plain hits leave the obstacle in place and stumble the snail; only breaks remove it', () => {
+    dom.storage.map.clear();
+    const game = makeGame();
+    game.start(); game.startRun();
+    const mod = game.__obstacleFactory; // set by the scenario suite when it runs first; fall back to import
+    return (mod ? Promise.resolve(mod) : import('../src/objects/Obstacle.js')).then((m) => {
+      const o = m.createObstacle('rock', 1, -0.9);
+      game.track.world.add(o.group); game.track.obstacles.push(o);
+      frames(game, 6);
+      assert.equal(o.hit, true);
+      assert.ok(game.track.world.children.includes(o.group), 'rock is still on the road after a plain hit');
+      assert.ok(game.slowFactor < 1, 'snail stumbles');
+      assert.ok(game.snail.bump > 0.5, 'wheel jolts backward');
+    });
+  });
+
   test('menu shows best distance and total dew from the save', () => {
     dom.storage.setItem('snail-runner-save-v1', JSON.stringify({ dew: 540, bestDistance: 1240, runs: 3, unlocked: ['armor', 'jump'], shell: ['armor','armor','jump','armor','armor','armor'], upgrades: {} }));
     const game = makeGame();
@@ -87,7 +115,7 @@ describe('GDD §50 — first test scenario, played headlessly', () => {
     assert.ok(game.sound.played.filter((n) => n === 'krrchak').length >= 6, 'KRR-CHAK per sector');
 
     // Slug sequence plays out, then RUN OVER appears with stats
-    seconds(game, 6);
+    seconds(game, 8);
     assert.ok(document.getElementById('runover').classList.contains('open'), 'RUN OVER screen shown');
     assert.ok(game.sound.played.includes('plop'), 'PLOP on the belly flop');
     assert.match(document.getElementById('overDistance').textContent, /\d+ m/);
@@ -111,7 +139,7 @@ describe('GDD §50 — first test scenario, played headlessly', () => {
     assert.equal(game.snail.jumping, false, 'cannot jump after losing the sector');
 
     game._applyShellEvents(game.shellState.breakAll());
-    seconds(game, 6);
+    seconds(game, 8);
     assert.equal(game.save.runs, 2);
     assert.ok(game.save.unlocked.includes('boost'));
   });
@@ -134,7 +162,7 @@ describe('GDD §50 — first test scenario, played headlessly', () => {
     assert.equal(game.boost.active, false, 'boost cancelled when its sector dies');
     assert.equal(document.getElementById('toast').textContent, 'BOOST LOST');
     game._applyShellEvents(game.shellState.breakAll());
-    seconds(game, 6);
+    seconds(game, 8);
     assert.ok(game.save.unlocked.includes('spike'));
   });
 
@@ -168,7 +196,7 @@ describe('GDD §50 — first test scenario, played headlessly', () => {
     assert.equal(game.slowFactor, 1, 'slow wears off after 1 s');
 
     game._applyShellEvents(game.shellState.breakAll());
-    seconds(game, 6);
+    seconds(game, 8);
     assert.ok(game.save.unlocked.includes('magnet'));
   });
 
@@ -313,6 +341,6 @@ describe('long soak — 3 minutes of random play with no errors or leaks', () =>
     assert.ok(game.track.props.length < 400, `props ${game.track.props.length}`);
     assert.ok(game.trail.blobs.length < 80);
     assert.ok(game.debris.items.length < 200);
-    assert.ok(game.speed <= 22 * 1.5 + 0.01);
+    assert.ok(game.speed <= 30 * 1.5 + 0.01);
   });
 });
